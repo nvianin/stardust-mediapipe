@@ -27,7 +27,7 @@ window.plane = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.Shade
     uniform sampler2D seg;
     uniform float time;
     uniform vec2 resolution;
-    uniform float[7] features;
+    uniform float[7] factors;
 
     varying vec2 vUv;
 
@@ -58,7 +58,7 @@ window.plane = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.Shade
             theta *= pwr;
             phi *= pwr;
 
-            z = zr * vec3(sin(theta + features[0]) * cos(phi + features[3]), sin(phi + features[5]) * sin(theta + features[6]), cos(theta + features[2]));
+            z = zr * vec3(sin(theta + (factors[0] + factors[4]) * 1.) * cos(phi + factors[3] * 1.), sin(phi + factors[5] * 1.) * sin(theta + factors[6] * 1.), cos(theta + factors[2] * 1.));
             z+=p;
         }
 
@@ -144,8 +144,9 @@ window.plane = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.Shade
         vec3 rd = getRayDirection(st-.5, ro, -angle -time*speed + PI);
         vec4 fractal = RayMarch(ro,rd);
 
-        gl_FragColor = vec4(mix(cam, fractal.yzw, mask.x), 1.);
+        gl_FragColor = mix(vec4(0.), vec4(fractal.yzw, 1.), mask.x);
         /* gl_FragColor = vec4(fractal.yzw, 1.); */
+        /* gl_FragColor = vec4(factors[0], factors[1], factors[2], 1.); */
     }
     `,
     vertexShader:
@@ -167,7 +168,7 @@ window.plane = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.Shade
             value: 0
         },
         factors: {
-            value: new Float32Array()
+            value: []
         },
         resolution: {
             value: new THREE.Vector2(innerWidth, innerHeight)
@@ -184,11 +185,64 @@ const setSize = () => {
     renderer.setSize(innerWidth, innerHeight);
     plane.material.uniforms.resolution.value.x = innerWidth
     plane.material.uniforms.resolution.value.y = innerHeight
+
+    processPlane.material.uniforms.resolution.value.x = innerWidth
+    processPlane.material.uniforms.resolution.value.y = innerHeight
+
+    renderTarget.setSize(innerWidth, innerHeight)
 }
+
+const renderTarget = new THREE.WebGLRenderTarget(
+    innerWidth,
+    innerHeight,
+    {
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+        wrapS: THREE.ClampToEdgeWrapping,
+        wrapT: THREE.ClampToEdgeWrapping,
+        format: THREE.RGBAFormat
+    }
+)
+const copyTexture = new THREE.DataTexture();
+const processScene = new THREE.Scene();
+const processPlane = new THREE.Mesh(
+    new THREE.PlaneGeometry(100, 100),
+    new THREE.ShaderMaterial({
+        fragmentShader:
+            `
+        uniform sampler2D tex;
+        uniform vec2 resolution;
+
+        void main() {
+            vec2 st = gl_FragCoord.xy / resolution;
+            /* st.x *= resolution.x / resolution.y; */
+            st.x *= 16./9.;
+            gl_FragColor = texture(tex, st);
+        }
+        `,
+        uniforms: {
+            tex: {
+                value: renderTarget.texture
+            },
+            resolution: {
+                value: new THREE.Vector2(innerWidth, innerHeight)
+            }
+        }
+    })
+)
+processPlane.position.z = 5;
+processPlane.rotation.x = Math.PI;
+processScene.add(processPlane);
 
 const render = () => {
     requestAnimationFrame(render)
+
+
+    renderer.setRenderTarget(renderTarget);
     renderer.render(scene, perspective_camera);
+
+    renderer.setRenderTarget(null)
+    renderer.render(processScene, perspective_camera);
 
     const t = clock.getElapsedTime();
 
@@ -202,6 +256,8 @@ document.body.appendChild(renderer.domElement);
 renderer.domElement.id = "three"
 setSize();
 window.addEventListener("resize", setSize)
+
+let prevFactors = []
 
 const onResults = results => {
 
@@ -225,6 +281,11 @@ const onResults = results => {
                 )
         )
     }
+    if (prevFactors.length == factors.length) {
+        for (let i = 0; i < factors.length; i++) {
+            factors[i] = (prevFactors[i] + factors[i]) / 2
+        }
+    }
     /* console.log(factors) */
 
     /* console.log(results.segmentationMask) */
@@ -232,6 +293,8 @@ const onResults = results => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(results.segmentationMask, 0, 0, canvas.width, canvas.height);
     plane.material.uniforms.seg.value.needsUpdate = true
+    plane.material.uniforms.factors.value = factors
+    /* console.log(factors) */
 
     /* ctx.save();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -250,6 +313,8 @@ const onResults = results => {
     drawLandmarks(ctx, results.poseLandmarks, { color: "#FF0000", lineWidth: 2 })
 
     ctx.restore(); */
+
+    prevFactors = factors;
 }
 
 const pose = new Pose({
