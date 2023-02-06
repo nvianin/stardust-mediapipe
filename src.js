@@ -27,6 +27,7 @@ window.plane = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.Shade
     uniform sampler2D seg;
     uniform float time;
     uniform vec2 resolution;
+    uniform float[7] features;
 
     varying vec2 vUv;
 
@@ -44,7 +45,7 @@ window.plane = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.Shade
         float pwr = 3.4;
         float r = 0.;
 
-        for(int i = 0; i < 64; i++){
+        for(int i = 0; i < 16; i++){
             r = length(z);
             if(r > 1.5)
                 break;
@@ -57,7 +58,7 @@ window.plane = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.Shade
             theta *= pwr;
             phi *= pwr;
 
-            z = zr * vec3(sin(theta) * cos(phi), sin(phi) * sin(theta), cos(theta));
+            z = zr * vec3(sin(theta + features[0]) * cos(phi + features[3]), sin(phi + features[5]) * sin(theta + features[6]), cos(theta + features[2]));
             z+=p;
         }
 
@@ -136,14 +137,15 @@ window.plane = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.Shade
         mask/=4.;
 
         float angle = 0.;
-        float dist = 1.;
+        float dist = 2.;
+        float speed = .2;
 
-        vec3 ro = vec3(sin(angle + time) * 1. * dist, 0., cos(angle + time) * 1. * dist);
-        vec3 rd = getRayDirection(st - .5, ro, -angle -time + PI);
+        vec3 ro = vec3(sin(angle + time*speed) * 1. * dist, 0., cos(angle + time*speed) * 1. * dist);
+        vec3 rd = getRayDirection(st-.5, ro, -angle -time*speed + PI);
         vec4 fractal = RayMarch(ro,rd);
 
-
         gl_FragColor = vec4(mix(cam, fractal.yzw, mask.x), 1.);
+        /* gl_FragColor = vec4(fractal.yzw, 1.); */
     }
     `,
     vertexShader:
