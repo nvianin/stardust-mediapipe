@@ -18,6 +18,42 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 const perspective_camera = new THREE.PerspectiveCamera();
 const scene = new THREE.Scene();
 
+const plane = new THREE.Mesh(new THREE.PlaneGeometry(100,100), new THREE.ShaderMaterial({
+    fragmentShader: `
+    uniform sampler2D webcam;
+    uniform sampler2D seg;
+
+    void main(){
+        gl_FragColor = vec4(1.);
+    }
+    `,
+    uniforms:{
+        webcam: {
+            value: new THREE.VideoTexture(videoElement)
+        },
+        seg: {
+            value: new THREE.Texture()
+        },
+        time: {
+            value: 0
+        },
+        factors:{
+            value: new Float32Array()
+        }
+    }
+}))
+
+const clock = new THREE.Clock();
+
+const render = () => {
+    requestAnimationFrame(render)
+    renderer.render(scene, perspective_camera);
+
+    const t = clock.getElapsedTime();
+
+    plane.material.uniforms.time.value = t;
+}
+
 document.body.appendChild(renderer.domElement);
 renderer.domElement.id = "three"
 renderer.setSize(innerWidth, innerHeight);
