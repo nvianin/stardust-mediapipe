@@ -107,7 +107,7 @@ window.plane = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.Shade
             /* float ao = clamp(-(dd - hr), 0., 1.);
             tally += ao * sca * vec4(1.); */
             occ += -(dd - hr) * sca;
-            sca *= .75;
+            sca *= .751;
         }
     
         return clamp(1. - 3. * occ, 0., 1.);
