@@ -16,76 +16,22 @@
         crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
 
-    <script type="module">
-        const videoElement = document.querySelector("#input-video")
-        const canvas = document.querySelector("canvas")
-        const ctx = canvas.getContext("2d")
-
-
-        const onResults = results => {
-
-            if (!results.poseLandmarks) {
-                console.log("pose error")
-                return
-            } else {
-                /* console.log(results) */
-            }
-
-            ctx.save();
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(results.segmentationMask, 0, 0, canvas.width, canvas.height);
-
-            ctx.globalCompositeOperation = "source-in";
-            ctx.fillStyle = "#00FF00";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            ctx.globalCompositeOperation = "destination-atop"
-            ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
-
-            ctx.globalCompositeOperation = "source-over"
-            drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS,
-                { color: "#00FF00", lineWidth: 4 })
-            drawLandmarks(ctx, results.poseLandmarks, { color: "#FF0000", lineWidth: 2 })
-
-            ctx.restore();
-        }
-
-        const pose = new Pose({
-            locateFile: (file) => {
-                return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
-            }
-        })
-        pose.setOptions({
-            modelComplexity: 1,
-            smoothLandmarks: true,
-            enableSegmentation: true,
-            smoothSegmentation: true,
-            minDetectionConfidence: .5,
-            minTrackingConfidence: .5
-        })
-
-        pose.onResults(onResults)
-
-        const camera = new Camera(videoElement, {
-            onFrame: async () => {
-                await pose.send({ image: videoElement })
-            },
-            width: 1280,
-            height: 720
-        });
-        camera.start();
-
-        canvas.width = 1280;
-        canvas.height = 720;
-
-    </script>
+    <script type="module" src="/dist/main.js"> </script>
 
     <style>
-        canvas {
+        #output-canvas {
             position: fixed;
             width: 100%;
             /* height: 100%; */
             z-index: 10;
+            top: 0;
+            left: 0;
+        }
+
+        #three {
+            position: fixed;
+            height: 100%;
+            width: 100%;
             top: 0;
             left: 0;
         }
