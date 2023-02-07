@@ -21,10 +21,24 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 const perspective_camera = new THREE.PerspectiveCamera();
 const scene = new THREE.Scene();
 
+const renderTarget = new THREE.WebGLRenderTarget(
+    innerWidth,
+    innerHeight,
+    {
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+        wrapS: THREE.ClampToEdgeWrapping,
+        wrapT: THREE.ClampToEdgeWrapping,
+        format: THREE.RGBAFormat
+    }
+)
+let copyTexture = new THREE.DataTexture({width: innerWidth, height: innerHeight});
+
 window.plane = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.ShaderMaterial({
     fragmentShader: `
     uniform sampler2D webcam;
     uniform sampler2D seg;
+    uniform sampler2D feedback;
     uniform float time;
     uniform vec2 resolution;
     uniform float[7] factors;
@@ -123,6 +137,17 @@ window.plane = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.Shade
         return cosineColor(t, vec3(0.5, 0.5, 0.5), vec3(0.5, 0.5, 0.5), vec3(0.01, 0.01, 0.01), vec3(0.00, 0.15, 0.20));
     }
 
+    vec4 radBlur(float n, float d, sampler2D tex, vec2 st) {
+        vec4 result = vec4(0.);
+
+        for(float i = 0.; i < n; i+= 1.){
+            float th = i/n * PI;
+            result += texture(tex, st + vec2(cos(th) * d, sin(th) * d));
+        }
+
+        return result / n;
+    }
+
     void main(){
         vec2 st = gl_FragCoord.xy / resolution;
         st.x *= resolution.x / resolution.y;
@@ -139,12 +164,23 @@ window.plane = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.Shade
         float angle = 0.;
         float dist = 2.;
         float speed = .2;
+        
+        vec4 fractal = vec4(0.);
+        
+        if(mask.x > 0.) {
+            vec3 ro = vec3(sin(angle + time*speed) * 1. * dist, 0., cos(angle + time*speed) * 1. * dist);
+            vec3 rd = getRayDirection(st-.5, ro, -angle -time*speed + PI);
+            fractal = RayMarch(ro,rd);
+        }
 
-        vec3 ro = vec3(sin(angle + time*speed) * 1. * dist, 0., cos(angle + time*speed) * 1. * dist);
-        vec3 rd = getRayDirection(st-.5, ro, -angle -time*speed + PI);
-        vec4 fractal = RayMarch(ro,rd);
+        vec4 fb = radBlur(4., .005, feedback, gl_FragCoord.xy / resolution + vec2(.01,0.));
+        fb = mix(fb, texture(feedback, gl_FragCoord.xy / resolution), mask.x);
+        /* vec4 fb = texture(feedback, gl_FragCoord.xy / resolution + vec2(.01, 0.)); */
+
 
         gl_FragColor = mix(vec4(cam, 1.), vec4(fractal.yzw, 1.), mask.x);
+        gl_FragColor = mix(gl_FragColor, fb, (1. - mask.x) * .99);
+        /* gl_FragColor = fb -.01; */
         /* gl_FragColor = vec4(cam, 1.); */
         /* gl_FragColor = vec4(fractal.yzw, 1.); */
         /* gl_FragColor = vec4(factors[0], factors[1], factors[2], 1.); */
@@ -165,6 +201,9 @@ window.plane = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.Shade
         seg: {
             value: new THREE.CanvasTexture(canvas)
         },
+        feedback: {
+            value: copyTexture
+        },
         time: {
             value: 0
         },
@@ -182,6 +221,7 @@ plane.position.z = 5
 perspective_camera.lookAt(plane.position)
 const clock = new THREE.Clock();
 
+
 const setSize = () => {
     renderer.setSize(innerWidth, innerHeight);
     plane.material.uniforms.resolution.value.x = innerWidth
@@ -191,20 +231,16 @@ const setSize = () => {
     processPlane.material.uniforms.resolution.value.y = innerHeight
 
     renderTarget.setSize(innerWidth, innerHeight)
+
+    copyTexture.copy(renderTarget.texture)
+
+    /* const data = new Uint8Array(innerWidth * innerHeight * 4); */
+    /* copyTexture = new THREE.DataTexture(data, innerWidth, innerHeight);
+    plane.material.uniforms.feedback.value = copyTexture;
+    plane.material.needsUpdate = true; */
+    
 }
 
-const renderTarget = new THREE.WebGLRenderTarget(
-    innerWidth,
-    innerHeight,
-    {
-        minFilter: THREE.LinearFilter,
-        magFilter: THREE.LinearFilter,
-        wrapS: THREE.ClampToEdgeWrapping,
-        wrapT: THREE.ClampToEdgeWrapping,
-        format: THREE.RGBAFormat
-    }
-)
-const copyTexture = new THREE.DataTexture();
 const processScene = new THREE.Scene();
 const processPlane = new THREE.Mesh(
     new THREE.PlaneGeometry(100, 100),
@@ -217,7 +253,7 @@ const processPlane = new THREE.Mesh(
         void main() {
             vec2 st = gl_FragCoord.xy / resolution;
             /* st.x *= resolution.x / resolution.y; */
-            st.x *= 16./9.;
+            /* st.x *= 16./9.; */
             gl_FragColor = texture(tex, st);
         }
         `,
@@ -241,9 +277,10 @@ const render = () => {
 
     renderer.setRenderTarget(renderTarget);
     renderer.render(scene, perspective_camera);
+    renderer.copyFramebufferToTexture(new THREE.Vector2(), copyTexture, 0)
 
     renderer.setRenderTarget(null)
-    renderer.render(processScene, perspective_camera);
+    renderer.render(scene, perspective_camera);
 
     const t = clock.getElapsedTime();
 
@@ -287,7 +324,7 @@ const onResults = results => {
             factors[i] = (prevFactors[i] + factors[i]) / 2
         }
     }
-    /* console.log(factors) */
+    console.log(factors)
 
     /* console.log(results.segmentationMask) */
 
@@ -324,7 +361,7 @@ const pose = new Pose({
     }
 })
 pose.setOptions({
-    modelComplexity: 1,
+    modelComplexity: 0,
     smoothLandmarks: true,
     enableSegmentation: true,
     smoothSegmentation: true,
