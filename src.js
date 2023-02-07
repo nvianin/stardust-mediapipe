@@ -17,7 +17,9 @@ const features = [
     [23, 27], // leg extension
 ]
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({
+    antialias: true
+});
 const perspective_camera = new THREE.PerspectiveCamera();
 const scene = new THREE.Scene();
 
@@ -144,13 +146,12 @@ window.plane = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.Shade
         vec3 rd = getRayDirection(st-.5, ro, -angle -time*speed + PI);
         vec4 fractal = RayMarch(ro,rd);
 
-        gl_FragColor = mix(vec4(0.), vec4(fractal.yzw, 1.), mask.x);
+        gl_FragColor = mix(vec4(cam, 1.), vec4(fractal.yzw, 1.), mask.x);
         /* gl_FragColor = vec4(fractal.yzw, 1.); */
         /* gl_FragColor = vec4(factors[0], factors[1], factors[2], 1.); */
     }
     `,
-    vertexShader:
-        `
+    vertexShader: `
     varying vec2 vUv;
     void main(){
         vUv = uv;
@@ -194,8 +195,7 @@ const setSize = () => {
 
 const renderTarget = new THREE.WebGLRenderTarget(
     innerWidth,
-    innerHeight,
-    {
+    innerHeight, {
         minFilter: THREE.LinearFilter,
         magFilter: THREE.LinearFilter,
         wrapS: THREE.ClampToEdgeWrapping,
@@ -208,8 +208,7 @@ const processScene = new THREE.Scene();
 const processPlane = new THREE.Mesh(
     new THREE.PlaneGeometry(100, 100),
     new THREE.ShaderMaterial({
-        fragmentShader:
-            `
+        fragmentShader: `
         uniform sampler2D tex;
         uniform vec2 resolution;
 
@@ -238,11 +237,11 @@ const render = () => {
     requestAnimationFrame(render)
 
 
-    renderer.setRenderTarget(renderTarget);
+    /* renderer.setRenderTarget(renderTarget); */
     renderer.render(scene, perspective_camera);
 
-    renderer.setRenderTarget(null)
-    renderer.render(processScene, perspective_camera);
+    /* renderer.setRenderTarget(null)
+    renderer.render(processScene, perspective_camera); */
 
     const t = clock.getElapsedTime();
 
@@ -274,11 +273,11 @@ const onResults = results => {
         factors.push(
             new THREE.Vector3(
                 results.poseLandmarks[f[0]].x, results.poseLandmarks[f[0]].y, results.poseLandmarks[f[0]].z)
-                .distanceTo(
-                    new THREE.Vector3(
-                        results.poseLandmarks[f[1]].x, results.poseLandmarks[f[1]].y, results.poseLandmarks[f[1]].z
-                    )
+            .distanceTo(
+                new THREE.Vector3(
+                    results.poseLandmarks[f[1]].x, results.poseLandmarks[f[1]].y, results.poseLandmarks[f[1]].z
                 )
+            )
         )
     }
     if (prevFactors.length == factors.length) {
@@ -335,7 +334,9 @@ pose.onResults(onResults)
 
 const camera = new Camera(videoElement, {
     onFrame: async () => {
-        await pose.send({ image: videoElement })
+        await pose.send({
+            image: videoElement
+        })
     },
     width: 1280,
     height: 720
