@@ -144,7 +144,8 @@ window.plane = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.Shade
         vec3 rd = getRayDirection(st-.5, ro, -angle -time*speed + PI);
         vec4 fractal = RayMarch(ro,rd);
 
-        gl_FragColor = mix(vec4(0.), vec4(fractal.yzw, 1.), mask.x);
+        gl_FragColor = mix(vec4(cam, 1.), vec4(fractal.yzw, 1.), mask.x);
+        /* gl_FragColor = vec4(cam, 1.); */
         /* gl_FragColor = vec4(fractal.yzw, 1.); */
         /* gl_FragColor = vec4(factors[0], factors[1], factors[2], 1.); */
     }
